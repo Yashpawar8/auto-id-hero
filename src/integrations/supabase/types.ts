@@ -14,7 +14,80 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      detections: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          id: string
+          image_url: string | null
+          matched_vehicle_id: string | null
+          plate: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          matched_vehicle_id?: string | null
+          plate: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          matched_vehicle_id?: string | null
+          plate?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "detections_matched_vehicle_id_fkey"
+            columns: ["matched_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicles: {
+        Row: {
+          created_at: string
+          fine_amount: number
+          id: string
+          notes: string | null
+          owner_name: string | null
+          plate: string
+          reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fine_amount?: number
+          id?: string
+          notes?: string | null
+          owner_name?: string | null
+          plate: string
+          reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fine_amount?: number
+          id?: string
+          notes?: string | null
+          owner_name?: string | null
+          plate?: string
+          reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
