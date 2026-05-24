@@ -74,9 +74,9 @@ export default function VehiclesPanel() {
     <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
       <Card className="p-6">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Plus className="h-5 w-5 text-primary" /> Register a vehicle
+          <Plus className="h-5 w-5 text-primary" /> Register campus vehicle
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">Add a plate with the fine to apply when detected.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Add a campus vehicle plate with any applicable fine.</p>
         <form onSubmit={add} className="mt-4 space-y-3">
           <div>
             <Label htmlFor="plate">Plate number *</Label>

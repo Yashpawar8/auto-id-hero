@@ -46,13 +46,13 @@ export default function HistoryPanel() {
   return (
     <Card className="p-6">
       <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <History className="h-5 w-5 text-primary" /> Detection history
+        <History className="h-5 w-5 text-primary" /> Campus detection history
       </h2>
       <div className="mt-4 space-y-2">
         {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
         {!isLoading && data.length === 0 && (
           <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-            No detections yet. Go to the Detect tab to scan your first plate.
+            No detections yet. Go to the Detect tab to scan your first campus vehicle.
           </p>
         )}
         {data.map((d) => (

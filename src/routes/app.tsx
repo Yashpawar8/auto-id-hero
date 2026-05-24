@@ -3,14 +3,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ScanLine, LogOut } from "lucide-react";
+import { GraduationCap, LogOut } from "lucide-react";
 import DetectPanel from "@/components/plate/DetectPanel";
 import VehiclesPanel from "@/components/plate/VehiclesPanel";
 import HistoryPanel from "@/components/plate/HistoryPanel";
 
 export const Route = createFileRoute("/app")({
   component: AppShell,
-  head: () => ({ meta: [{ title: "Dashboard — PlateWatch" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — MBES College" }] }),
 });
 
 function AppShell() {
@@ -43,9 +43,9 @@ function AppShell() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to="/" className="flex items-center gap-2 font-bold">
             <span className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground">
-              <ScanLine className="h-5 w-5" />
+              <GraduationCap className="h-5 w-5" />
             </span>
-            PlateWatch
+            MBES College of Engineering
           </Link>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-muted-foreground sm:inline">{email}</span>
