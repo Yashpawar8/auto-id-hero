@@ -53,19 +53,19 @@ export default function DetectPanel() {
         .maybeSingle();
 
       // Upload image to storage
-      let imageUrl: string | null = null;
+      let imagePath: string | null = null;
       try {
         const blob = await (await fetch(imageDataUrl)).blob();
         const path = `${userId}/${Date.now()}.jpg`;
         const { error: upErr } = await supabase.storage.from("plates").upload(path, blob, { contentType: blob.type || "image/jpeg" });
-        if (!upErr) imageUrl = supabase.storage.from("plates").getPublicUrl(path).data.publicUrl;
+        if (!upErr) imagePath = path;
       } catch (e) { console.error(e); }
 
       await supabase.from("detections").insert({
         user_id: userId,
         plate: res.plate,
         confidence: res.confidence,
-        image_url: imageUrl,
+        image_url: imagePath,
         matched_vehicle_id: vehicle?.id ?? null,
       });
       qc.invalidateQueries({ queryKey: ["detections"] });
