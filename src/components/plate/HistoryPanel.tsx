@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -28,6 +29,20 @@ export default function HistoryPanel() {
     },
   });
 
+  const [signed, setSigned] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const paths = data.map((d) => d.image_url).filter((p): p is string => !!p && !p.startsWith("http"));
+    if (paths.length === 0) return;
+    let cancelled = false;
+    supabase.storage.from("plates").createSignedUrls(paths, 3600).then(({ data: signedData }) => {
+      if (cancelled || !signedData) return;
+      const map: Record<string, string> = {};
+      signedData.forEach((s, i) => { if (s.signedUrl) map[paths[i]] = s.signedUrl; });
+      setSigned(map);
+    });
+    return () => { cancelled = true; };
+  }, [data]);
+
   return (
     <Card className="p-6">
       <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -42,8 +57,8 @@ export default function HistoryPanel() {
         )}
         {data.map((d) => (
           <div key={d.id} className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3">
-            {d.image_url ? (
-              <img src={d.image_url} alt={d.plate} className="h-14 w-20 rounded-md object-cover" />
+            {d.image_url && signed[d.image_url] ? (
+              <img src={signed[d.image_url]} alt={d.plate} className="h-14 w-20 rounded-md object-cover" />
             ) : (
               <div className="grid h-14 w-20 place-items-center rounded-md bg-background text-xs text-muted-foreground">no image</div>
             )}
