@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ScanLine } from "lucide-react";
+import { GraduationCap } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Sign in — PlateWatch" }, { name: "description", content: "Sign in to PlateWatch to detect plates and manage fines." }] }),
+  head: () => ({ meta: [{ title: "Sign in — MBES College" }, { name: "description", content: "Sign in to MBES College Vehicle Management System." }] }),
 });
 
 function LoginPage() {
@@ -31,7 +31,7 @@ function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) return toast.error(error.message);
-    toast.success("Welcome back");
+    toast.success("Welcome to MBES College system");
     navigate({ to: "/app" });
   };
 
@@ -53,9 +53,9 @@ function LoginPage() {
       <div className="w-full max-w-md">
         <Link to="/" className="mb-8 flex items-center justify-center gap-2 font-bold">
           <span className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground">
-            <ScanLine className="h-5 w-5" />
+            <GraduationCap className="h-5 w-5" />
           </span>
-          PlateWatch
+          MBES College of Engineering
         </Link>
         <div className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-glow)]">
           <Tabs defaultValue="signin">
