@@ -82,9 +82,9 @@ export default function DetectPanel() {
     <div className="grid gap-6 lg:grid-cols-2">
       <Card className="p-6">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Camera className="h-5 w-5 text-primary" /> Detect a plate
+          <Camera className="h-5 w-5 text-primary" /> Detect campus vehicle
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">Upload a car photo and AI will read the plate.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Upload a campus vehicle photo and AI will read the plate number.</p>
 
         <div
           className="mt-4 grid aspect-video place-items-center overflow-hidden rounded-lg border-2 border-dashed border-border bg-secondary/30 cursor-pointer"
@@ -93,11 +93,11 @@ export default function DetectPanel() {
           onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
         >
           {imageDataUrl ? (
-            <img src={imageDataUrl} alt="Vehicle" className="h-full w-full object-contain" />
+            <img src={imageDataUrl} alt="Campus vehicle" className="h-full w-full object-contain" />
           ) : (
             <div className="text-center text-muted-foreground">
               <Upload className="mx-auto h-8 w-8" />
-              <p className="mt-2 text-sm">Click or drag a car photo here</p>
+              <p className="mt-2 text-sm">Click or drag a vehicle photo here</p>
             </div>
           )}
         </div>
@@ -162,11 +162,11 @@ export default function DetectPanel() {
               </div>
             ) : (
               <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                <div className="flex items-center gap-2 text-[oklch(0.7_0.15_150)]">
+                <div className="flex items-center gap-2 text-success">
                   <CheckCircle2 className="h-5 w-5" />
                   <span className="font-semibold">No fines on record</span>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">This plate isn't registered in your database.</p>
+                <p className="mt-1 text-sm text-muted-foreground">This plate isn't registered in the campus database.</p>
               </div>
             )}
           </div>
