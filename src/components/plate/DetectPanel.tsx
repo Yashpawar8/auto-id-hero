@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Upload, Loader2, Camera, CheckCircle2, XCircle, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { detectPlate } from "@/lib/plates.functions";
+import { detectPlate, saveDetection } from "@/lib/plates.functions";
 
 type Result = {
   plate: string;
@@ -21,6 +21,7 @@ export default function DetectPanel() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const detect = useServerFn(detectPlate);
+  const save = useServerFn(saveDetection);
   const qc = useQueryClient();
 
   const handleFile = async (file: File) => {
@@ -43,33 +44,30 @@ export default function DetectPanel() {
         toast.error(res.error ?? "No plate detected");
         return;
       }
-      // Match against user vehicles
+      // Upload image to storage (RLS restricts uploads to the user's own folder).
       const { data: userRes } = await supabase.auth.getUser();
-      const userId = userRes.user!.id;
-      const { data: vehicle } = await supabase
-        .from("vehicles")
-        .select("id, plate, owner_name, fine_amount, reason")
-        .ilike("plate", res.plate)
-        .maybeSingle();
-
-      // Upload image to storage
+      const userId = userRes.user?.id;
       let imagePath: string | null = null;
-      try {
-        const blob = await (await fetch(imageDataUrl)).blob();
-        const path = `${userId}/${Date.now()}.jpg`;
-        const { error: upErr } = await supabase.storage.from("plates").upload(path, blob, { contentType: blob.type || "image/jpeg" });
-        if (!upErr) imagePath = path;
-      } catch (e) { console.error(e); }
+      if (userId) {
+        try {
+          const blob = await (await fetch(imageDataUrl)).blob();
+          const path = `${userId}/${Date.now()}.jpg`;
+          const { error: upErr } = await supabase.storage.from("plates").upload(path, blob, { contentType: blob.type || "image/jpeg" });
+          if (!upErr) imagePath = path;
+        } catch (e) { console.error(e); }
+      }
 
-      await supabase.from("detections").insert({
-        user_id: userId,
-        plate: res.plate,
-        confidence: res.confidence,
-        image_url: imagePath,
-        matched_vehicle_id: vehicle?.id ?? null,
+      // Server matches against this user's vehicles and inserts the detection
+      // using the JWT-derived user_id (never trusts a client-supplied id).
+      const saved = await save({
+        data: { plate: res.plate, confidence: res.confidence, image_path: imagePath },
       });
+      if (!saved.ok) {
+        toast.error(saved.message);
+        return;
+      }
       qc.invalidateQueries({ queryKey: ["detections"] });
-      setResult({ plate: res.plate, confidence: res.confidence, matched: vehicle ?? null });
+      setResult({ plate: res.plate, confidence: res.confidence, matched: saved.matched });
     } catch (e) {
       console.error(e);
       toast.error("Detection failed");

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { addVehicle, deleteVehicle } from "@/lib/plates.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +22,8 @@ type Vehicle = {
 
 export default function VehiclesPanel() {
   const qc = useQueryClient();
+  const addVehicleFn = useServerFn(addVehicle);
+  const deleteVehicleFn = useServerFn(deleteVehicle);
   const { data: vehicles = [], isLoading } = useQuery({
     queryKey: ["vehicles"],
     queryFn: async () => {
@@ -44,19 +48,19 @@ export default function VehiclesPanel() {
     const clean = plate.toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!clean) return toast.error("Enter a plate");
     setSaving(true);
-    const { data: userRes } = await supabase.auth.getUser();
-    const { error } = await supabase.from("vehicles").insert({
-      user_id: userRes.user!.id,
-      plate: clean,
-      owner_name: owner || null,
-      fine_amount: Number(amount) || 0,
-      reason: reason || null,
-      notes: notes || null,
-    });
+    const res = await addVehicleFn({
+      data: {
+        plate: clean,
+        owner_name: owner || null,
+        fine_amount: Number(amount) || 0,
+        reason: reason || null,
+        notes: notes || null,
+      },
+    }).catch((e: Error) => ({ ok: false as const, code: null, message: e.message }));
     setSaving(false);
-    if (error) {
-      if (error.code === "23505") return toast.error("Plate already registered");
-      return toast.error(error.message);
+    if (!res.ok) {
+      if (res.code === "23505") return toast.error("Plate already registered");
+      return toast.error(res.message);
     }
     toast.success("Vehicle added");
     setPlate(""); setOwner(""); setAmount(""); setReason(""); setNotes("");
@@ -64,8 +68,11 @@ export default function VehiclesPanel() {
   };
 
   const remove = async (id: string) => {
-    const { error } = await supabase.from("vehicles").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    const res = await deleteVehicleFn({ data: { id } }).catch((e: Error) => ({
+      ok: false as const,
+      message: e.message,
+    }));
+    if (!res.ok) return toast.error(res.message);
     toast.success("Removed");
     qc.invalidateQueries({ queryKey: ["vehicles"] });
   };
