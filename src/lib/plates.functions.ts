@@ -80,3 +80,101 @@ export const detectPlate = createServerFn({ method: "POST" })
       return { plate: null, confidence: 0, error: "Could not parse AI response" };
     }
   });
+
+const plateSchema = z.string().min(1).max(20).regex(/^[A-Z0-9]+$/);
+
+export const addVehicle = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        plate: z.string().min(1).max(32),
+        owner_name: z.string().max(120).nullable().optional(),
+        fine_amount: z.number().min(0).max(1_000_000).optional(),
+        reason: z.string().max(200).nullable().optional(),
+        notes: z.string().max(1000).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const clean = data.plate.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const plate = plateSchema.parse(clean);
+    const { error } = await supabase.from("vehicles").insert({
+      user_id: userId,
+      plate,
+      owner_name: data.owner_name || null,
+      fine_amount: data.fine_amount ?? 0,
+      reason: data.reason || null,
+      notes: data.notes || null,
+    });
+    if (error) return { ok: false as const, code: error.code ?? null, message: error.message };
+    return { ok: true as const };
+  });
+
+export const deleteVehicle = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase
+      .from("vehicles")
+      .delete()
+      .eq("id", data.id)
+      .eq("user_id", userId);
+    if (error) return { ok: false as const, message: error.message };
+    return { ok: true as const };
+  });
+
+export const saveDetection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        plate: z.string().min(1).max(32),
+        confidence: z.number().min(0).max(1),
+        image_path: z.string().max(500).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const plate = plateSchema.parse(data.plate.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+
+    // Validate image_path belongs to this user (must be under "<userId>/...")
+    let safePath: string | null = null;
+    if (data.image_path) {
+      if (!data.image_path.startsWith(`${userId}/`)) {
+        return { ok: false as const, message: "Invalid image path" };
+      }
+      safePath = data.image_path;
+    }
+
+    const { data: vehicle } = await supabase
+      .from("vehicles")
+      .select("id, plate, owner_name, fine_amount, reason")
+      .eq("user_id", userId)
+      .ilike("plate", plate)
+      .maybeSingle();
+
+    const { error } = await supabase.from("detections").insert({
+      user_id: userId,
+      plate,
+      confidence: data.confidence,
+      image_url: safePath,
+      matched_vehicle_id: vehicle?.id ?? null,
+    });
+    if (error) return { ok: false as const, message: error.message };
+    return {
+      ok: true as const,
+      matched: vehicle
+        ? {
+            id: vehicle.id,
+            plate: vehicle.plate,
+            owner_name: vehicle.owner_name,
+            fine_amount: Number(vehicle.fine_amount),
+            reason: vehicle.reason,
+          }
+        : null,
+    };
+  });
