@@ -9,6 +9,15 @@ import VehiclesPanel from "@/components/plate/VehiclesPanel";
 import HistoryPanel from "@/components/plate/HistoryPanel";
 
 export const Route = createFileRoute("/app")({
+  beforeLoad: async () => {
+    // Server-side / SSR: no session storage → getUser() returns no user → redirect.
+    // Client: re-validates the JWT against the auth server before the page renders,
+    // so the authenticated dashboard shell is never served to unauthenticated requests.
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+      throw redirect({ to: "/login" });
+    }
+  },
   component: AppShell,
   head: () => ({ meta: [{ title: "Dashboard — MBES College" }] }),
 });
