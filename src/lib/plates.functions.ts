@@ -3,7 +3,11 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const detectInput = z.object({
-  imageDataUrl: z.string().min(20).max(15_000_000),
+  imageDataUrl: z
+    .string()
+    .min(20)
+    .max(15_000_000)
+    .refine((v) => v.startsWith("data:image/"), "Must be a data:image/* URL"),
 });
 
 export const detectPlate = createServerFn({ method: "POST" })
@@ -15,48 +19,50 @@ export const detectPlate = createServerFn({ method: "POST" })
       return { plate: null, confidence: 0, error: "AI is not configured" };
     }
 
+    const body = {
+      model: "google/gemini-2.5-flash",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a license-plate OCR system. Look at the image and read the vehicle's license plate. Respond ONLY by calling the report_plate tool. plate = the characters exactly as printed, uppercase A-Z and 0-9 only (strip spaces, dashes, dots, state names, country codes). confidence = 0..1. If no plate is visible OR the image isn't a vehicle, call the tool with plate=\"\" confidence=0.",
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Read the license plate in this image." },
+            { type: "image_url", image_url: { url: data.imageDataUrl } },
+          ],
+        },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "report_plate",
+            description: "Report the detected license plate.",
+            parameters: {
+              type: "object",
+              properties: {
+                plate: { type: "string", description: "Plate text, uppercase, no spaces" },
+                confidence: { type: "number", minimum: 0, maximum: 1 },
+              },
+              required: ["plate", "confidence"],
+              additionalProperties: false,
+            },
+          },
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "report_plate" } },
+    };
+
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You read vehicle license plates from photos. Always respond by calling the report_plate tool with the plate text exactly as it appears (uppercase letters and digits, no spaces or dashes) and a confidence between 0 and 1. If no plate is visible, return plate as an empty string and confidence 0.",
-          },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Read the license plate in this image." },
-              { type: "image_url", image_url: { url: data.imageDataUrl } },
-            ],
-          },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "report_plate",
-              description: "Report the detected license plate.",
-              parameters: {
-                type: "object",
-                properties: {
-                  plate: { type: "string", description: "Plate text, uppercase, no spaces" },
-                  confidence: { type: "number", minimum: 0, maximum: 1 },
-                },
-                required: ["plate", "confidence"],
-                additionalProperties: false,
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "report_plate" } },
-      }),
+      body: JSON.stringify(body),
     });
 
     if (res.status === 429) return { plate: null, confidence: 0, error: "Rate limit exceeded, try again shortly." };
@@ -64,21 +70,36 @@ export const detectPlate = createServerFn({ method: "POST" })
     if (!res.ok) {
       const t = await res.text();
       console.error("AI gateway error", res.status, t);
-      return { plate: null, confidence: 0, error: "AI service error" };
+      return { plate: null, confidence: 0, error: `AI service error (${res.status})` };
     }
 
     const json = await res.json();
-    const call = json?.choices?.[0]?.message?.tool_calls?.[0];
-    if (!call) return { plate: null, confidence: 0, error: "No response from AI" };
-    try {
-      const args = JSON.parse(call.function.arguments);
-      const plate = String(args.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-      const confidence = Number(args.confidence) || 0;
-      if (!plate) return { plate: null, confidence: 0, error: "No plate detected in image" };
-      return { plate, confidence, error: null as string | null };
-    } catch {
-      return { plate: null, confidence: 0, error: "Could not parse AI response" };
+    const msg = json?.choices?.[0]?.message;
+    const call = msg?.tool_calls?.[0];
+    let plateRaw = "";
+    let confidence = 0;
+    if (call?.function?.arguments) {
+      try {
+        const args = typeof call.function.arguments === "string"
+          ? JSON.parse(call.function.arguments)
+          : call.function.arguments;
+        plateRaw = String(args.plate || "");
+        confidence = Number(args.confidence) || 0;
+      } catch (e) {
+        console.error("tool_call parse failed", e, call.function.arguments);
+      }
     }
+    // Fallback: pull a plate-shaped token from the assistant text content.
+    if (!plateRaw && typeof msg?.content === "string") {
+      const m = msg.content.toUpperCase().match(/[A-Z0-9]{4,10}/);
+      if (m) { plateRaw = m[0]; confidence = 0.5; }
+    }
+    const plate = plateRaw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!plate) {
+      console.error("No plate parsed. AI response:", JSON.stringify(json).slice(0, 500));
+      return { plate: null, confidence: 0, error: "No plate detected in image" };
+    }
+    return { plate, confidence, error: null as string | null };
   });
 
 const plateSchema = z.string().min(1).max(20).regex(/^[A-Z0-9]+$/);
