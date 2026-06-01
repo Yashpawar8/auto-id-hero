@@ -24,14 +24,41 @@ export default function DetectPanel() {
   const save = useServerFn(saveDetection);
   const qc = useQueryClient();
 
+  const downscale = (file: File, maxDim = 1280, quality = 0.85): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Could not read file"));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Could not decode image"));
+        img.onload = () => {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("Canvas not supported"));
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+
   const handleFile = async (file: File) => {
-    if (file.size > 10 * 1024 * 1024) return toast.error("Image too large (max 10MB)");
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImageDataUrl(reader.result as string);
+    if (!file.type.startsWith("image/")) return toast.error("Please choose an image file");
+    if (file.size > 20 * 1024 * 1024) return toast.error("Image too large (max 20MB)");
+    try {
+      const dataUrl = await downscale(file);
+      setImageDataUrl(dataUrl);
       setResult(null);
-    };
-    reader.readAsDataURL(file);
+    } catch (e) {
+      console.error(e);
+      toast.error("Could not process image");
+    }
   };
 
   const runDetect = async () => {
@@ -44,7 +71,7 @@ export default function DetectPanel() {
         toast.error(res.error ?? "No plate detected");
         return;
       }
-      // Upload image to storage (RLS restricts uploads to the user's own folder).
+      // Only upload after a successful detection. RLS restricts to the user's own folder.
       const { data: userRes } = await supabase.auth.getUser();
       const userId = userRes.user?.id;
       let imagePath: string | null = null;
@@ -52,8 +79,11 @@ export default function DetectPanel() {
         try {
           const blob = await (await fetch(imageDataUrl)).blob();
           const path = `${userId}/${Date.now()}.jpg`;
-          const { error: upErr } = await supabase.storage.from("plates").upload(path, blob, { contentType: blob.type || "image/jpeg" });
+          const { error: upErr } = await supabase.storage
+            .from("plates")
+            .upload(path, blob, { contentType: "image/jpeg", upsert: false });
           if (!upErr) imagePath = path;
+          else console.error("storage upload failed", upErr);
         } catch (e) { console.error(e); }
       }
 
